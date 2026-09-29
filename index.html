@@ -124,10 +124,24 @@ function defaultUntilTime(){
  const d=new Date(Date.now()+30*60000);
  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+function resetJourneyGoals(){
+ cfg.durationEnabled=false;
+ cfg.goalHours=0;
+ cfg.goalMinutes=30;
+ cfg.untilEnabled=false;
+ cfg.untilTime=null;
+ cfg.longEnabled=true;
+ cfg.longHours=6;
+ alarmedDuration=false;
+ alarmedUntil=false;
+ longNext=0;
+ untilManuallyEdited=false;
+ localStorage.setItem(CFG,JSON.stringify(cfg));
+}
 function saveCfg(){
  cfg.durationEnabled=$('durationEnabled').checked;cfg.goalHours=Math.max(0,Math.min(23,Number($('goalHours').value)||0));cfg.goalMinutes=Math.max(0,Math.min(59,Number($('goalMinutes').value)||0));if(cfg.durationEnabled&&(cfg.goalHours*60+cfg.goalMinutes)<30){cfg.goalHours=0;cfg.goalMinutes=30;$('goalHours').value=0;$('goalMinutes').value=30;}cfg.untilEnabled=$('untilEnabled').checked;cfg.untilTime=$('untilTime').value||'02:00';cfg.longEnabled=$('longEnabled').checked;cfg.longHours=Math.max(1,Math.min(24,Number($('longHours').value)||6));$('longHours').value=cfg.longHours;cfg.alarmSound=$('alarmSound').value;localStorage.setItem(CFG,JSON.stringify(cfg));
 }
-function loadCfgUI(){$('durationEnabled').checked=cfg.durationEnabled;$('goalHours').value=cfg.goalHours;$('goalMinutes').value=cfg.goalMinutes;$('untilEnabled').checked=cfg.untilEnabled;$('untilTime').value=cfg.untilTime||defaultUntilTime();if(!cfg.untilTime){cfg.untilTime=$('untilTime').value;localStorage.setItem(CFG,JSON.stringify(cfg))};$('longEnabled').checked=cfg.longEnabled;$('longHours').value=cfg.longHours||6;$('alarmSound').value=cfg.alarmSound||'classic'}
+function loadCfgUI(){$('durationEnabled').checked=cfg.durationEnabled;$('goalHours').value=cfg.goalHours;$('goalMinutes').value=cfg.goalMinutes;$('untilEnabled').checked=cfg.untilEnabled;$('untilTime').value=cfg.untilTime||defaultUntilTime();$('longEnabled').checked=cfg.longEnabled;$('longHours').value=cfg.longHours||6;$('alarmSound').value=cfg.alarmSound||'classic'}
 function tone(ctx,freq,start,duration,volume=.16){
  let o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=freq;g.gain.setValueAtTime(volume,start);g.gain.exponentialRampToValueAtTime(.001,start+duration);o.start(start);o.stop(start+duration);
 }
@@ -300,7 +314,7 @@ function render(){
 }
 function tick(){let n=new Date();$('clock').textContent=n.toLocaleTimeString('es-ES');$('today').textContent=n.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});$('timer').textContent=active?hms(Date.now()-active):'00:00:00';updateDiscord();updateGoals()}
 $('btnIn').onclick=()=>{active=Date.now();alarmedDuration=false;alarmedUntil=false;longNext=active+(cfg.longHours||6)*3600000;save();render();tick()};
-$('btnOut').onclick=()=>{if(!active)return;records.push({id:Date.now(),start:active,end:Date.now()});active=null;$('alarmModal').classList.remove('open');save();render();tick()};
+$('btnOut').onclick=()=>{if(!active)return;records.push({id:Date.now(),start:active,end:Date.now()});active=null;stopAlarmSound();$('alarmModal').classList.remove('open');resetJourneyGoals();loadCfgUI();save();render();tick()};
 $('toggle').onclick=()=>{$('manual').classList.toggle('open')};
 $('manual').onsubmit=e=>{e.preventDefault();let d=$('date').value,s=$('start').value,en=$('end').value;if(!d||!s||!en)return;let a=new Date(`${d}T${s}:00`).getTime(),b=new Date(`${d}T${en}:00`).getTime();if(b<=a)b+=86400000;records.push({id:Date.now(),start:a,end:b});save();$('msg').textContent='✓ Guardado';render()};
 $('rows').addEventListener('click',e=>{
@@ -329,8 +343,9 @@ $('copyDiscord').onclick=async()=>{
  }
  setTimeout(()=>{$('copyMsg').textContent=''},3000);
 };
-let untilManuallyEdited=!!cfg.untilTime;
+let untilManuallyEdited=!!active&&!!cfg.untilTime;
 loadCfgUI();
+if(!active){resetJourneyGoals();loadCfgUI();}
 ['durationEnabled','goalHours','goalMinutes','longEnabled','longHours','alarmSound'].forEach(id=>$(id).addEventListener('change',()=>{saveCfg();alarmedDuration=false;alarmedUntil=false;updateGoals()}));
 $('untilTime').addEventListener('change',()=>{untilManuallyEdited=true;saveCfg();alarmedUntil=false;updateGoals()});
 $('untilEnabled').addEventListener('change',()=>{
@@ -348,7 +363,7 @@ $('alarmOut').addEventListener('click',()=>{$('alarmModal').classList.remove('op
 $('testAlarm').addEventListener('click',()=>{Notification.requestPermission().catch(()=>{})},{once:true});
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
- let untilManuallyEdited=!!cfg.untilTime;
+ let untilManuallyEdited=!!active&&!!cfg.untilTime;
 loadCfgUI();
 ['durationEnabled','goalHours','goalMinutes','longEnabled','longHours','alarmSound'].forEach(id=>$(id).addEventListener('change',()=>{saveCfg();alarmedDuration=false;alarmedUntil=false;updateGoals()}));
 $('untilTime').addEventListener('change',()=>{untilManuallyEdited=true;saveCfg();alarmedUntil=false;updateGoals()});
